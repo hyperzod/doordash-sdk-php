@@ -8,18 +8,25 @@ namespace Hyperzod\DoordashSdkPhp\Client;
 interface BaseDoordashClientInterface
 {
    /**
-    * Gets the username used by the client to send requests.
+    * Gets the developer id used by the client to send requests.
     *
-    * @return null|string the username used by the client to send requests
+    * @return null|string the developer id used by the client to send requests
     */
-   public function getUsername();
+   public function getDeveloperId();
 
    /**
-    * Gets the password used by the client to send requests.
+    * Gets the key id used by the client to send requests.
     *
-    * @return null|string the password used by the client to send requests
+    * @return null|string the key id used by the client to send requests
     */
-   public function getPassword();
+   public function getKeyId();
+
+   /**
+    * Gets the signing secret used by the client to send requests.
+    *
+    * @return null|string the signing secret used by the client to send requests
+    */
+   public function getSigningSecret();
 
    /**
     * Gets the base URL for Doordash's API.

@@ -16,16 +16,18 @@ class BaseDoordashClient implements DoordashClientInterface
     * Initializes a new instance of the {@link BaseDoordashClient} class.
     *
     * The constructor takes two arguments.
-    * @param string $username the Username for Doordash's API
-    * @param string $password the Password for Doordash's API
+    * @param string $developer_id the Developer ID for Doordash's API
+    * @param string $key_id the Key ID for Doordash's API
+    * @param string $signing_secret the Signing Secret for Doordash's API
     * @param string $api_base the base URL for Doordash's API
     */
 
-   public function __construct($username, $password, $api_base)
+   public function __construct($developer_id, $key_id, $signing_secret, $api_base)
    {
       $config = $this->validateConfig(array(
-         "username" => $username,
-         "password" => $password,
+         "developer_id" => $developer_id,
+         "key_id" => $key_id,
+         "signing_secret" => $signing_secret,
          "api_base" => $api_base
       ));
 
@@ -33,24 +35,35 @@ class BaseDoordashClient implements DoordashClientInterface
    }
 
    /**
-    * Gets the username used by the client to send requests.
+    * Gets the developer id used by the client to send requests.
     *
-    * @return null|string the username used by the client to send requests
+    * @return null|string the Developer ID used by the client to send requests
     */
-   public function getUsername()
+   public function getDeveloperId()
    {
-      return $this->config['username'];
+      return $this->config['developer_id'];
    }
 
    /**
-    * Gets the password used by the client to send requests.
+    * Gets the key id used by the client to send requests.
     *
-    * @return null|string the password used by the client to send requests
+    * @return null|string the key id used by the client to send requests
     */
 
-   public function getPassword()
+   public function getKeyId()
    {
-      return $this->config['password'];
+      return $this->config['key_id'];
+   }
+
+   /**
+    * Gets the signing secret used by the client to send requests.
+    *
+    * @return null|string the signing secret id used by the client to send requests
+    */
+
+   public function getSigningSecret()
+   {
+      return $this->config['signing_secret'];
    }
 
    /**
@@ -63,49 +76,49 @@ class BaseDoordashClient implements DoordashClientInterface
       return $this->config['api_base'];
    }
 
-   // Get access token through login api
    public function getAccessToken()
    {
-      $headers['content-type'] = 'application/json';
-
-      $client = new Client([
-         'headers' => $headers,
+      $header = json_encode([
+         'alg' => 'HS256',
+         'typ' => 'JWT',
+         'dd-ver' => 'DD-JWT-V1'
       ]);
 
-      $api = $this->getApiBase() . '/login';
-
-      $response = $client->request('POST', $api, [
-         'json' => [
-            'username' => $this->getUsername(),
-            'password' => $this->getPassword()
-         ]
+      $payload = json_encode([
+         'aud' => 'doordash',
+         'iss' => $this->getDeveloperId(),
+         'kid' => $this->getKeyId(),
+         'exp' => time() + 300,
+         'iat' => time()
       ]);
 
-      $response = json_decode($response->getBody(), true);
+      $base64UrlHeader = $this->base64UrlEncode($header);
+      $base64UrlPayload = $this->base64UrlEncode($payload);
 
-      return $response['data']['token'];
+      $signature = hash_hmac('sha256', $base64UrlHeader . "." . $base64UrlPayload, $this->base64UrlDecode($this->getSigningSecret()), true);
+      $base64UrlSignature = $this->base64UrlEncode($signature);
+
+      $jwt = $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
+
+      return $jwt;
    }
 
    public function request($method, $path, $params)
    {
-      $headers['content-type'] = 'application/json';
-      $headers['Authorization'] = $params['access_token'];
-      // unset token from params
-      unset($params['access_token']);
-
       $client = new Client([
-         'headers' => $headers,
+         'headers' => [
+            'accept' => 'application/json',
+            'content-type' => 'application/json',
+            'Authorization' => 'Bearer ' . $this->getAccessToken()
+         ]
       ]);
 
       $api = $this->getApiBase() . $path;
 
-      if ($method == 'GET') {
-         $response = $client->request($method, $api);
-      } else {
-         $response = $client->request($method, $api, [
-            'json' => $params
-         ]);
-      }
+      $response = $client->request($method, $api, [
+         'http_errors' => true,
+         'body' => json_encode($params)
+      ]);
 
       return $this->validateResponse($response);
    }
@@ -117,35 +130,49 @@ class BaseDoordashClient implements DoordashClientInterface
     */
    private function validateConfig($config)
    {
-      // username
-      if (!isset($config['username'])) {
-         throw new InvalidArgumentException('username field is required');
+      // developer_id
+      if (!isset($config['developer_id'])) {
+         throw new InvalidArgumentException('developer_id field is required');
       }
 
-      if (!is_string($config['username'])) {
-         throw new InvalidArgumentException('username must be a string');
+      if (!is_string($config['developer_id'])) {
+         throw new InvalidArgumentException('developer_id must be a string');
       }
 
-      if ($config['username'] === '') {
-         throw new InvalidArgumentException('username cannot be an empty string');
+      if ($config['developer_id'] === '') {
+         throw new InvalidArgumentException('developer_id cannot be an empty string');
       }
 
-      if (preg_match('/\s/', $config['username'])) {
-         throw new InvalidArgumentException('username cannot contain whitespace');
+      if (preg_match('/\s/', $config['developer_id'])) {
+         throw new InvalidArgumentException('developer_id cannot contain whitespace');
       }
 
-      // password
-      if (!isset($config['password'])) {
-         throw new InvalidArgumentException('password field is required');
+      // key_id
+      if (!isset($config['key_id'])) {
+         throw new InvalidArgumentException('key_id field is required');
       }
 
-      if (!is_string($config['password'])) {
-         throw new InvalidArgumentException('password must be a string');
+      if (!is_string($config['key_id'])) {
+         throw new InvalidArgumentException('key_id must be a string');
       }
 
-      if ($config['password'] === '') {
-         throw new InvalidArgumentException('password cannot be an empty string');
+      if ($config['key_id'] === '') {
+         throw new InvalidArgumentException('key_id cannot be an empty string');
       }
+
+      // signing_secret
+      if (!isset($config['signing_secret'])) {
+         throw new InvalidArgumentException('signing_secret field is required');
+      }
+
+      if (!is_string($config['signing_secret'])) {
+         throw new InvalidArgumentException('signing_secret must be a string');
+      }
+
+      if ($config['signing_secret'] === '') {
+         throw new InvalidArgumentException('signing_secret cannot be an empty string');
+      }
+
 
       if (!isset($config['api_base'])) {
          throw new InvalidArgumentException('api_base field is required');
@@ -160,8 +187,9 @@ class BaseDoordashClient implements DoordashClientInterface
       }
 
       return [
-         "username" => $config['username'],
-         "password" => $config['password'],
+         "developer_id" => $config['developer_id'],
+         "key_id" => $config['key_id'],
+         "signing_secret" => $config['signing_secret'],
          "api_base" => $config['api_base'],
       ];
    }
@@ -185,5 +213,17 @@ class BaseDoordashClient implements DoordashClientInterface
          }
          throw new Exception("Errors node not set in server response");
       }
+   }
+
+   private function base64UrlEncode(string $data): string
+   {
+      $base64Url = strtr(base64_encode($data), '+/', '-_');
+
+      return rtrim($base64Url, '=');
+   }
+
+   private function base64UrlDecode(string $base64Url): string
+   {
+      return base64_decode(strtr($base64Url, '-_', '+/'));
    }
 }

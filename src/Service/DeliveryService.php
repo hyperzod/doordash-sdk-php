@@ -4,7 +4,7 @@ namespace Hyperzod\DoordashSdkPhp\Service;
 
 use Hyperzod\DoordashSdkPhp\Enums\HttpMethodEnum;
 
-class OrderService extends AbstractService
+class DeliveryService extends AbstractService
 {
    /**
     * Create a job on Doordash
@@ -16,7 +16,7 @@ class OrderService extends AbstractService
     */
    public function create(array $params)
    {
-      return $this->request(HttpMethodEnum::POST, '/order', $params);
+      return $this->request(HttpMethodEnum::POST, '/deliveries', $params);
    }
 
    /**
@@ -30,6 +30,6 @@ class OrderService extends AbstractService
 
    public function get(array $params)
    {
-      return $this->request(HttpMethodEnum::GET, '/order/' . $params['order_id'], $params);
+      return $this->request(HttpMethodEnum::GET, '/deliveries/' . $params['order_id'], $params);
    }
 }
